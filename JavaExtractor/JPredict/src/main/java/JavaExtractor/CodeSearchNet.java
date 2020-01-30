@@ -59,7 +59,7 @@ public class CodeSearchNet {
 
         String toPrint = featuresToString(features);
         // System.out.println(toPrint);
-        jsonObject.addProperty("path", toPrint);
+        jsonObject.addProperty("path_contexts", toPrint);
         return jsonObject.toString();
     }
 
