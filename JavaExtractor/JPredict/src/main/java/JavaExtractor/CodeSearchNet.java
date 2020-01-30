@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.args4j.CmdLineException;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -34,12 +35,15 @@ public class CodeSearchNet {
             return;
         }
 
-        try (Stream<String> lines = Files.lines(Paths.get(train_in), Charset.defaultCharset())) {
-            lines.forEachOrdered(line -> processLine(line, s_CommandLineValues));
+        try (Stream<String> lines = Files.lines(Paths.get(train_in), Charset.defaultCharset());
+             PrintWriter output = new PrintWriter(train_out, Charset.defaultCharset()))
+        {
+            //lines.forEachOrdered(line -> processLine(line, s_CommandLineValues));
+            lines.map(line -> processLine(line, s_CommandLineValues)).forEachOrdered(output::println);
         }
     }
 
-    private static void processLine(String line, CommandLineValues s_CommandLineValues) {
+    private static String processLine(String line, CommandLineValues s_CommandLineValues) {
         JsonObject jsonObject = JsonParser.parseString(line).getAsJsonObject();
         String code = jsonObject.get("code").getAsString();
         // code = code.replaceAll("\\\\n", "").replaceAll("\\\\t", "");
@@ -54,7 +58,9 @@ public class CodeSearchNet {
         }
 
         String toPrint = featuresToString(features);
-        System.out.println(toPrint);
+        // System.out.println(toPrint);
+        jsonObject.addProperty("path", toPrint);
+        return jsonObject.toString();
     }
 
     public static String featuresToString(ArrayList<ProgramFeatures> features) {
