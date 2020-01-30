@@ -33,6 +33,11 @@ public class ProgramRelation {
 				m_Target.getName());
 	}
 
+	public String toPathString() {
+		return String.format("%s,%s,%s", m_Source.getName(), m_Path,
+				m_Target.getName());
+	}
+
 	@JsonIgnore
 	public String getPath() {
 		return m_Path;

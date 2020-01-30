@@ -24,6 +24,14 @@ public class ProgramFeatures {
 		return stringBuilder.toString();
 	}
 
+	public String toPathString() {
+		StringBuilder stringBuilder = new StringBuilder();
+		stringBuilder.append(name).append(" ");
+		stringBuilder.append(features.stream().map(ProgramRelation::toPathString).collect(Collectors.joining(" ")));
+
+		return stringBuilder.toString();
+	}
+
 	public void addFeature(Property source, String path, Property target) {
 		ProgramRelation newRelation = new ProgramRelation(source, target, path);
 		features.add(newRelation);
