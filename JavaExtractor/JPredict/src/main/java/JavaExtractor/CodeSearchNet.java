@@ -4,6 +4,7 @@ import JavaExtractor.Common.CommandLineValues;
 import JavaExtractor.Common.Common;
 import JavaExtractor.FeaturesEntities.ProgramFeatures;
 import com.github.javaparser.ParseException;
+import com.github.javaparser.ParseProblemException;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.commons.lang3.StringUtils;
@@ -13,21 +14,19 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class CodeSearchNet {
+    private static CommandLineValues s_CommandLineValues;
+    private static List<Integer> lineNumbers;
+
     public static void main(String[] args) throws IOException {
-        String input_filepath = new String("/home/larumuga/Downloads/codesearchnet_java/java/final/jsonl/train");
-        String train_in = input_filepath + "/java_sample.jsonl";
-        System.out.println(train_in);
-
-        String output_filepath = new String("/home/larumuga/Downloads/codesearchnet_java/java/code2vec_features/train");
-        String train_out = output_filepath + "/java_sample.jsonl";
-
-        CommandLineValues s_CommandLineValues;
         try {
             s_CommandLineValues = new CommandLineValues(args);
         } catch (CmdLineException e) {
@@ -35,25 +34,72 @@ public class CodeSearchNet {
             return;
         }
 
-        try (Stream<String> lines = Files.lines(Paths.get(train_in), Charset.defaultCharset());
-             PrintWriter output = new PrintWriter(train_out, Charset.defaultCharset()))
-        {
-            //lines.forEachOrdered(line -> processLine(line, s_CommandLineValues));
-            lines.map(line -> processLine(line, s_CommandLineValues)).forEachOrdered(output::println);
+        String inputPath = "/home/larumuga/Downloads/codesearchnet_java/java/final/jsonl/";
+        String outputPath = "/home/larumuga/Downloads/codesearchnet_java/java/code2vec_features/";
+        String[] inputDirs = {inputPath + "test"};
+        String[] outputDir = {outputPath + "test"};
+
+        for (int i = 0; i < inputDirs.length; i++) {
+            System.out.println(inputDirs[i]);
+            processDir(inputDirs[i], outputDir[i]);
+            System.out.println();
         }
     }
 
-    private static String processLine(String line, CommandLineValues s_CommandLineValues) {
+    private static void processDir(String inputDir, String outputDir) {
+        try {
+            Files.walk(Paths.get(inputDir)).filter(Files::isRegularFile)
+                    .filter(p -> p.toString().toLowerCase().endsWith(".jsonl")).forEach(f -> {
+                try {
+                    processFile(f, outputDir);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+    }
+
+
+    private static void processFile(Path f, String outputDir) throws IOException {
+        String outputFile = outputDir + "/" + f.getFileName();
+        lineNumbers = new ArrayList<Integer>();
+        AtomicInteger i = new AtomicInteger(1);
+
+        try (Stream<String> lines = Files.lines(f, Charset.defaultCharset());
+             PrintWriter output = new PrintWriter(outputFile, Charset.defaultCharset()))
+        {
+            lines.map(line -> {
+                String result = processLine(line, i.get());
+                i.set(i.get() + 1);
+                return result;
+            }).forEachOrdered(output::println);
+        }
+
+        System.out.print(f.getFileName() + ": ");
+        System.out.println(lineNumbers.stream().map(Object::toString).collect(Collectors.joining(", ")));
+    }
+
+
+    private static String processLine(String line, int lineNumber) {
         JsonObject jsonObject = JsonParser.parseString(line).getAsJsonObject();
         String code = jsonObject.get("code").getAsString();
-        // code = code.replaceAll("\\\\n", "").replaceAll("\\\\t", "");
-        // System.out.println(code);
+        //code = code.replaceAll("\\\\n", "").replaceAll("\\\\t", "");
+        //if (lineNumber == 2501) {
+        //    System.out.println(code);
+        //}
 
         FeatureExtractor featureExtractor = new FeatureExtractor(s_CommandLineValues);
         ArrayList<ProgramFeatures> features = null;
         try {
             features = featureExtractor.extractFeatures(code);
-        } catch (ParseException | IOException e) {
+        } catch (ParseProblemException e) {
+            jsonObject.addProperty("path_contexts", "INCOMPLETE_SNIPPET void,void,void");
+            lineNumbers.add(lineNumber);
+            return jsonObject.toString();
+        } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
 
